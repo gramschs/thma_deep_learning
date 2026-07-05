@@ -72,7 +72,7 @@ Learning Rate
   *die Learning Rate*. Schrittweite des {term}`Gradientenabstieg`s, in PyTorch das Argument `lr` des {term}`Optimizer`s. Einer der wichtigsten Hyperparameter des Trainings. (Kapitel 4, vertieft in Kapitel 5)
 
 Loss
-  *die Loss* (auch: die Loss-Funktion). Maß für den Fehler zwischen den Vorhersagen des Modells und den Zielwerten, zum Beispiel der {term}`MSE` bei Regression. Die Loss ist die Größe, die das Training minimiert; ihr Verlauf über die Epochen ist das wichtigste Diagnoseinstrument.
+  *der Loss* (auch: die Loss-Funktion). Maß für den Fehler zwischen den Vorhersagen des Modells und den Zielwerten, zum Beispiel der {term}`MSE` bei Regression. Der Loss ist die Größe, die das Training minimiert; sein Verlauf über die Epochen ist das wichtigste Diagnoseinstrument.
 
 Machine Learning
   *das Machine Learning* (auch: maschinelles Lernen). Oberbegriff für Verfahren, die Zusammenhänge aus Daten lernen statt sie explizit zu programmieren. Das klassische Machine Learning (zum Beispiel lineare Regression, Entscheidungsbäume) ist auf tabellarischen Daten oft die richtige erste Wahl. (Abgrenzung zu Deep Learning: Kapitel 4)
@@ -99,7 +99,7 @@ Seed
   *der Seed*. Startwert des Zufallszahlengenerators, in PyTorch gesetzt mit `torch.manual_seed(...)`. Ein fester Seed macht Initialisierung, Shuffling und Datensplits reproduzierbar. (Kapitel 4)
 
 Shape
-  *der Shape*. Die Dimensionen eines Tensors, abrufbar über das Attribut `.shape`. Konvention im Skript: Daten als 2D-Tensor mit einer Zeile pro Beispiel, Zielgrößen als `(n, 1)`. (Kapitel 4)
+  *die Shape*. Die Dimensionen eines Tensors, abrufbar über das Attribut `.shape`. Konvention im Skript: Daten als 2D-Tensor mit einer Zeile pro Beispiel, Zielgrößen als `(n, 1)`. (Kapitel 4)
 
 Shuffling
   *das Shuffling*. Mischen der Reihenfolge der Trainingsbeispiele vor jeder {term}`Epoche`, im {term}`DataLoader` aktiviert mit `shuffle=True`. Verhindert, dass sortierte Daten das Training systematisch verzerren. (Kapitel 4)

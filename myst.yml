@@ -64,7 +64,7 @@ project:
         - file: chapter08/chapter08_sec02.md
         - file: chapter08/chapter08_sec03.md
         - file: chapter08/chapter08_sec04.md
-    - file: glossar.md
+#    - file: glossar.md
 
 site:
   template: book-theme

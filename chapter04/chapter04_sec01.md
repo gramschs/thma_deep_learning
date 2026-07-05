@@ -6,271 +6,737 @@ kernelspec:
 
 # 4.1 PyTorch: Tensoren und Autograd
 
+% Hinweise zur Datei:
+% - Diese Quelldatei ist die Musterlösung: alle Code-Zellen sind gefüllt
+%   (so erscheint sie in der HTML-Version auf GitHub Pages).
+% - Präsenz-Export: Mini-Übungen entfernen; die mit "% Lücke (Präsenz):"
+%   markierten Zeilen durch `# IHR CODE HIER` und `...` ersetzen.
+% - Selbststudium-Export: Mini-Übungen bleiben enthalten, keine Lücken.
+% - "% Live-Frage:" = mündliche Vorhersagefrage für den Präsenztermin
+%   (ersetzt dort die entfallende Mini-Übung).
+% - "% Präsenz:" = Regieanweisung zur Zeitplanung im Termin.
+% - Zeitbudget Präsenz (Code-along gesamt ca. 25 min): Video-1-Stoff ca. 9 min,
+%   Video-2-Stoff ca. 12 min, Video-3-Stoff ca. 4 min; danach Studio-Aufgabe.
+% TODO Glossar: Tensor, Autograd, Berechnungsgraph (Computational Graph),
+% Gradientenakkumulation, Broadcasting, Sättigung vor Veröffentlichung in
+% GLOSSAR.md eintragen.
+
 In Kapitel 3 haben wir die Gradienten unseres Mini-Netzes von Hand berechnet:
 vier Gewichte, eine halbe Seite Kettenregel. Ein Netz, das Schweißnähte auf
 Fotos prüft, hat mehrere Millionen Gewichte, und nach jeder Änderung der
 Architektur müssten wir sämtliche Ableitungen neu herleiten. *Wer soll das
-rechnen?* Genau hier setzt PyTorch an: Die Bibliothek speichert unsere Daten als
-Tensoren und leitet jede Rechnung, die wir damit ausführen, vollautomatisch ab.
-In dieser Sektion lernen wir beide Bausteine kennen und prüfen am Beispiel aus
-Kapitel 3 nach, dass PyTorch tatsächlich dieselben Gradienten liefert wie unsere
-Handrechnung.
+rechnen?* Genau hier setzt PyTorch an: Die Bibliothek speichert unsere Daten
+als Tensoren und leitet jede Rechnung, die wir damit ausführen, vollautomatisch
+ab. In diesem Kapitel lernen wir beide Bausteine kennen und prüfen am Beispiel
+aus Kapitel 3 nach, dass PyTorch tatsächlich dieselben Gradienten liefert wie
+unsere Handrechnung.
+
+## Lernziele
 
 ```{admonition} Lernziele
 :class: attention
 * [ ] Sie können PyTorch-Tensoren erzeugen und zwischen NumPy-Arrays und
   Tensoren konvertieren.
-* [ ] Sie können erklären, was requires_grad bewirkt und wie PyTorch den
+* [ ] Sie können erklären, was `requires_grad` bewirkt und wie PyTorch den
   Berechnungsgraphen aufbaut.
-* [ ] Sie können mit backward() Gradienten berechnen und das Ergebnis mit einer
-  Handrechnung aus Kapitel 3 abgleichen.
+* [ ] Sie können mit `backward()` Gradienten berechnen und das Ergebnis mit
+  einer Handrechnung aus Kapitel 3 abgleichen.
 * [ ] Sie können erklären, welche Arbeit Autograd uns abnimmt und welche nicht.
 ```
 
-## Vom NumPy-Array zum Tensor
+## Tensoren: Daten in PyTorch
 
-Stellen wir uns eine Messreihe aus einem Zugversuch vor: vier Kraftmesswerte,
-abgelegt in einem NumPy-Array, so wie wir es aus der Datenauswertung kennen.
-PyTorch arbeitet nicht mit NumPy-Arrays, sondern mit einem eigenen Datentyp, dem
-**Tensor** (englisch: "Tensor"). Ein Tensor ist zunächst nichts anderes als ein
-mehrdimensionales Zahlenfeld, also das direkte Gegenstück zum NumPy-Array. Die
-Funktion `from_numpy()` erzeugt aus einem NumPy-Array einen PyTorch-Tensor:
+% Video 1 (ca. 7-8 min). Präsenz: ca. 9 min inklusive Lücken.
+
+Aus der Technischen Mechanik kennen wir Vektoren und Matrizen: Ein Kraftvektor
+hat drei Komponenten, eine Steifigkeitsmatrix ist ein rechteckiges Zahlenschema.
+Deep-Learning-Daten sprengen dieses Raster schnell. Ein Farbbild hat Höhe,
+Breite und drei Farbkanäle, ein Stapel aus 32 Farbbildern sogar vier
+Dimensionen. PyTorch fasst deshalb alles unter einem einzigen Oberbegriff
+zusammen: dem **Tensor**, einem Zahlenschema mit beliebig vielen Dimensionen.
+Ein Skalar ist ein Tensor mit null Dimensionen, ein Vektor einer mit einer
+Dimension, eine Matrix einer mit zwei Dimensionen, und so weiter.
+
+Als durchgehendes Beispiel dieses Kapitels begleitet uns eine Schraubenfeder aus
+dem Prüflabor: Wir lenken sie unterschiedlich weit aus und messen die
+Rückstellkraft. Vier Messwerte der Kraft (in Newton) speichern wir als unseren
+ersten Tensor. Wie bei Pandas und NumPy importieren wir zuerst das Modul; die
+übliche Abkürzung für PyTorch ist schlicht `torch`.
 
 ```{code-cell} python
-import numpy as np
 import torch
 
-kraft_numpy = np.array([0.0, 1.2, 2.3, 3.1])   # Kraft in kN
-kraft_tensor = torch.from_numpy(kraft_numpy)
-
-print(kraft_tensor)
-print(type(kraft_tensor))
+kraefte = torch.tensor([2.9, 5.1, 6.6, 9.0])
+print(kraefte)
 ```
 
-Der Rückweg ist genauso kurz: `kraft_tensor.numpy()` liefert wieder ein
-NumPy-Array. Wichtig ist dabei eine Eigenheit, die gerne übersehen wird:
-`torch.from_numpy` kopiert die Daten nicht, sondern legt eine zweite Sicht auf
-denselben Speicher an. Ändern wir das NumPy-Array, ändert sich der Tensor mit:
+Die Ausgabe sieht fast aus wie eine Liste, trägt aber das Etikett `tensor`.
+Was ein Tensor über die reinen Zahlen hinaus weiß, verraten uns seine
+Attribute, allen voran `shape` (die Größe entlang jeder Dimension) und
+`dtype` (der gemeinsame Datentyp aller Elemente):
 
 ```{code-cell} python
-kraft_numpy[0] = 99.0
-print(kraft_tensor)
+print(kraefte.shape)
+print(kraefte.dtype)
 ```
 
-Wollen wir eine echte Kopie, verwenden wir stattdessen
-`torch.tensor(kraft_numpy)`.
+`torch.Size([4])` bedeutet: eine Dimension mit vier Einträgen, also ein
+Vektor der Länge 4. Ein kurzer Blick auf `shape` ist im Alltag das wichtigste
+Diagnosewerkzeug überhaupt: Die meisten Fehlermeldungen der kommenden Wochen
+sind am Ende Shape-Konflikte, und `print(x.shape)` ist fast immer der erste
+Schritt der Fehlersuche. Der Datentyp `float32` ist eine 32-Bit-Kommazahl und
+der Standard im Deep Learning: Sie braucht nur halb so viel Speicher wie die
+aus NumPy gewohnte 64-Bit-Kommazahl, rechnet auf GPUs deutlich schneller, und
+die geringere Genauigkeit spielt beim Training neuronaler Netze praktisch keine
+Rolle. Wie bei einem NumPy-Array gilt: Ein Tensor erzwingt einen gemeinsamen
+Datentyp für alle Elemente.
 
-Tensoren lassen sich natürlich auch direkt erzeugen, ganz analog zu NumPy:
+Tensoren mit mehr oder weniger Dimensionen erzeugen wir nach demselben Muster.
+Ein Skalar entsteht aus einer einzelnen Zahl, eine Matrix aus einer Liste von
+Listen, und für zufällig initialisierte Gewichte gibt es die Funktion
+`torch.randn` (standardnormalverteilte Zufallszahlen), der wir wie immer einen
+Seed voranstellen:
 
 ```{code-cell} python
 torch.manual_seed(42)
 
-a = torch.tensor([[1.0, 2.0], [3.0, 4.0]])  # aus einer Liste
-b = torch.zeros(2, 3)                       # nur Nullen
-c = torch.randn(2, 3)                       # standardnormalverteilte Zufallszahlen
+temperatur = torch.tensor(21.5)
+messmatrix = torch.tensor([[1.0, 2.9], [2.0, 5.1], [3.0, 6.6], [4.0, 9.0]])
+zufallsgewichte = torch.randn(3)
 
-print(a.shape)
-print(b.shape)
-print(c)
+print(temperatur.shape)
+print(messmatrix.shape)
+print(zufallsgewichte)
 ```
 
-Das Attribut `.shape` zeigt die Dimensionen des Tensors an. Es wird unser
-wichtigstes Diagnosewerkzeug: Die meisten Fehler in den kommenden Wochen sind
-Shape-Fehler, und `print(x.shape)` ist fast immer der erste Schritt der
-Fehlersuche.
+Der Skalar hat die leere Shape `torch.Size([])`, also null Dimensionen. Die
+Matrix hat die Shape `[4, 2]`: vier Zeilen (Messungen) und zwei Spalten
+(Auslenkung und Kraft). Daneben gibt es unter anderem `torch.zeros` und
+`torch.ones` für Tensoren voller Nullen beziehungsweise Einsen; das Muster ist
+immer dasselbe, das Argument bestimmt die Shape.
 
-Ein Unterschied zu NumPy verdient besondere Aufmerksamkeit: der Datentyp. NumPy
-rechnet standardmäßig mit 64-Bit-Gleitkommazahlen (`float64`), PyTorch dagegen
-mit 32 Bit (`float32`). Für das Training neuronaler Netze reicht die geringere
-Genauigkeit aus, und sie halbiert den Speicherbedarf. Ein per `from_numpy`
-konvertierter Tensor bringt allerdings den NumPy-Datentyp mit. Vor dem Training
-konvertieren wir deshalb grundsätzlich:
-
-```{code-cell} python
-kraft_float32 = torch.from_numpy(kraft_numpy).float()
-print(kraft_float32.dtype)
-```
-
-### Rechnen mit Tensoren
-
-Alle Rechenoperationen, die wir von NumPy kennen, funktionieren auf Tensoren
-genauso: elementweise Operationen, Aggregationen wie `mean()` und `sum()`,
-Matrixmultiplikation mit dem Operator `@` und Broadcasting, also das
-automatische Aufweiten kleinerer Tensoren auf passende Dimensionen.
-
-```{code-cell} python
-gewichte = torch.tensor([[0.5, -1.0], [2.0, 0.0]])
-eingabe = torch.tensor([1.0, 2.0])
-
-print(gewichte @ eingabe)      # Matrix-Vektor-Produkt
-print((eingabe ** 2).sum())    # elementweises Quadrat, dann Summe
-```
+% Live-Frage: Welche Shape hätte ein Stapel aus 32 Graustufenbildern
+% mit je 28 x 28 Pixeln? (Antwort: [32, 28, 28])
 
 ```{admonition} Mini-Übung
 :class: tip
-Was gibt die folgende Zelle aus? Überlegen Sie zuerst, führen Sie die Zelle dann
-aus.
+Ordnen Sie zu: Wie viele Dimensionen hat der passende Tensor, und wie könnte
+seine Shape lauten?
+
+1. Die aktuelle Temperatur eines einzelnen Sensors.
+2. Eine Messreihe aus 500 Kraftwerten.
+3. Ein Graustufenbild mit 28 x 28 Pixeln.
+4. Ein Stapel aus 32 solchen Graustufenbildern.
 ```
 
+```{admonition} Lösung
+:class: tip
+:class: dropdown
+1. Null Dimensionen (Skalar), Shape `[]`.
+2. Eine Dimension (Vektor), Shape `[500]`.
+3. Zwei Dimensionen (Matrix), Shape `[28, 28]`.
+4. Drei Dimensionen, Shape `[32, 28, 28]`. Die neue, vorangestellte Dimension
+   zählt die Bilder im Stapel. Genau in dieser Form werden wir später
+   Trainingsdaten portionsweise durch ein Netz schicken.
+```
+
+Rechnen können wir mit Tensoren genau so, wie wir es von NumPy gewohnt sind:
+Operationen wirken elementweise, Aggregationen wie `sum()` und `mean()`
+verdichten alle Elemente zu einer Zahl. Eine Kombination verdient besondere
+Aufmerksamkeit, weil sie uns am Ende dieses Kapitels als Verlustfunktion
+wiederbegegnet: der mittlere quadratische Abstand.
+
 ```{code-cell} python
-:tags: [skip-execution]
+print(kraefte * 2)
+print(kraefte.mean())
+print(((kraefte - 5.0)**2).mean())
+```
+
+Die erste Zeile verdoppelt jeden Messwert einzeln, die zweite bildet den
+Mittelwert aller Kräfte, und die dritte berechnet in einem Rutsch, wie weit
+die Messwerte im quadratischen Mittel vom Wert 5 entfernt liegen. Merken wir
+uns dieses Muster `((a - b)**2).mean()`, es ist wortwörtlich der mittlere
+quadratische Fehler aus Kapitel 3.
+
+% Live-Frage: a hat Shape [2, 3], b hat Shape [3]. Welche Shape hat a + b?
+% (Antwort: [2, 3], Broadcasting; im Termin nur erwähnen, Details im Skript)
+
+````{admonition} Mini-Übung
+:class: tip
+Was gibt die folgende Zelle aus? Überlegen Sie zuerst, prüfen Sie dann in der
+Code-Zelle.
+
+```python
 a = torch.ones(2, 3)
 b = torch.arange(3)
 print((a + b).shape)
 ```
+````
+
+```{code-cell} python
+# Code-Zelle
+```
 
 ```{admonition} Lösung
 :class: tip
 :class: dropdown
-Die Ausgabe ist `torch.Size([2, 3])`. Der Vektor `b` mit Shape `(3,)` wird per
-Broadcasting auf jede der beiden Zeilen von `a` addiert. Das Ergebnis behält den
-Shape von `a`. Broadcasting ist bequem, aber auch eine häufige Quelle stiller
-Fehler. Darauf kommen wir in der nächsten Sektion zurück.
+Die Ausgabe ist `torch.Size([2, 3])`. Der Vektor `b` mit Shape `[3]` wird per
+**Broadcasting** automatisch auf jede der beiden Zeilen von `a` aufgeweitet,
+das Ergebnis behält die Shape von `a`. Broadcasting ist bequem, aber auch eine
+häufige Quelle stiller Fehler, weil Rechnungen mit eigentlich unpassenden
+Shapes kommentarlos durchlaufen. Zusammen mit der Matrixmultiplikation
+(Operator `@`) kommen wir darauf im nächsten Kapitel zurück, sobald wir
+ganze Schichten auf einmal rechnen.
 ```
 
-## Autograd: Gradienten automatisch
+In der Praxis liegen Messdaten selten als handgetippte Listen vor, sondern
+kommen als NumPy-Arrays aus der Messdatenerfassung oder aus Pandas. Die Brücke
+zwischen beiden Welten ist kurz: `torch.from_numpy` macht aus einem Array einen
+Tensor, die Methode `.numpy()` führt zurück.
+
+% Präsenz: die folgenden beiden Zellen nur zeigen und in einem Satz
+% zusammenfassen ("so kommen Messdaten hinein, .float() nicht vergessen").
+% Details (float64, Kopie vs. geteilter Speicher) übernehmen Skript und Video.
+
+```{code-cell} python
+import numpy as np
+
+auslenkung_np = np.array([1.0, 2.0, 3.0, 4.0])
+auslenkung = torch.from_numpy(auslenkung_np)
+print(auslenkung)
+print(auslenkung.dtype)
+```
+
+Hier lohnt der zweite Blick auf den Datentyp: `float64` statt `float32`, denn
+NumPy rechnet standardmäßig mit 64 Bit und `torch.from_numpy` übernimmt den
+Datentyp unverändert. Für das Training konvertieren wir deshalb üblicherweise
+mit `.float()` in das PyTorch-Standardformat:
+
+```{code-cell} python
+auslenkung = torch.from_numpy(auslenkung_np).float()
+print(auslenkung.dtype)
+```
+
+````{admonition} Mini-Übung
+:class: tip
+Eine Kollegin erzeugt einen Tensor mit `torch.from_numpy` und ändert
+anschließend das NumPy-Array:
+
+```python
+messung_np = np.array([1.0, 2.0, 3.0])
+messung = torch.from_numpy(messung_np)
+messung_np[0] = 99.0
+print(messung)
+```
+
+Was gibt die letzte Zeile aus? Stellen Sie zuerst eine Vermutung auf und
+prüfen Sie sie dann in der Code-Zelle.
+````
+
+```{code-cell} python
+# Code-Zelle
+```
+
+```{admonition} Lösung
+:class: tip
+:class: dropdown
+Die Ausgabe ist `tensor([99., 2., 3.], dtype=torch.float64)`. Der Tensor hat
+sich mitgeändert, denn `torch.from_numpy` kopiert die Daten nicht, sondern
+legt eine zweite Sicht auf denselben Speicher an. Das ist schnell und spart
+Speicher, kann aber überraschen. Wer eine unabhängige Kopie braucht, verwendet
+`torch.tensor(messung_np)` oder hängt wie oben `.float()` an, denn die
+Typkonvertierung erzeugt ebenfalls eine Kopie.
+```
+
+## Autograd: PyTorch rechnet die Gradienten
+
+% Video 2 (ca. 10-12 min). Präsenz: ca. 12 min inklusive Lücken.
 
 Zurück zu unserem eigentlichen Problem. Stellen wir uns ein Netz mit 10.000
 Gewichten vor, dessen Vorhersagen noch schlecht sind. An welchem Gewicht sollen
-wir drehen, und in welche Richtung? Um diese Frage zu beantworten, brauchen wir
-für jedes einzelne Gewicht die Information, wie empfindlich die Loss auf eine
-kleine Änderung genau dieses Gewichts reagiert. Das ist dieselbe Denkweise wie
-bei einer Sensitivitätsanalyse in der Strukturmechanik: Dort fragen wir, wie
-stark sich die Durchbiegung ändert, wenn wir eine Wanddicke geringfügig
-variieren. Mathematisch ist diese Empfindlichkeit nichts anderes als die
-partielle Ableitung der Loss nach dem jeweiligen Gewicht, und der Vektor aller
-dieser Ableitungen ist der **Gradient**, den wir in Kapitel 3 von Hand berechnet
-haben.
+wir drehen, und in welche Richtung? Dafür brauchen wir für jedes einzelne
+Gewicht die Information, wie empfindlich die Verlustfunktion auf eine kleine
+Änderung genau dieses Gewichts reagiert. Das ist dieselbe Denkweise wie bei
+einer Sensitivitätsanalyse in der Strukturmechanik: Dort fragen wir, wie stark
+sich die Durchbiegung ändert, wenn wir eine Wanddicke geringfügig variieren.
+Mathematisch ist diese Empfindlichkeit die partielle Ableitung der
+Verlustfunktion nach dem jeweiligen Gewicht, und der Vektor aller dieser
+Ableitungen ist der Gradient, den wir in Kapitel 3 über die Kettenregel von Hand
+berechnet haben.
 
-PyTorch übernimmt diese Rechnung mit seinem Modul **Autograd** (englisch:
-"Automatic Differentiation"). Die Idee: Sobald wir einen Tensor mit
-`requires_grad=True` markieren, protokolliert PyTorch jede Operation, die diesen
-Tensor betrifft, in einem **Berechnungsgraphen** (englisch: "Computational
-Graph"). Der Graph merkt sich, welche Größe aus welchen anderen Größen durch
-welche Operation entstanden ist. Rufen wir am Ende `backward()` auf, läuft
-PyTorch diesen Graphen rückwärts ab und wendet dabei automatisch die Kettenregel
-an, genau so, wie wir es in Kapitel 3 von Hand getan haben.
+*Wie sagen wir PyTorch, dass es diese Arbeit übernehmen soll?* Wir beginnen mit
+dem kleinstmöglichen Modell, das wir noch komplett im Kopf ableiten können: ein
+Gewicht, ein Messwert. Das Modell sagt $\hat{y} = w \cdot x$ voraus, die
+Verlustfunktion ist der quadratische Fehler zum Messwert. Der Schlüssel ist ein
+einziges zusätzliches Argument beim Erzeugen des Gewichts: `requires_grad=True`.
+Damit melden wir die Variable bei PyTorch an: Beobachte alles, was mit diesem
+Tensor gerechnet wird.
 
-Sehen wir uns das am kleinstmöglichen Beispiel an: ein Gewicht, ein Messwert.
+% Lücke (Präsenz): das Argument `requires_grad=True`
 
 ```{code-cell} python
-x = torch.tensor(2.0)                          # Eingabe
-w = torch.tensor(1.5, requires_grad=True)      # Gewicht, soll abgeleitet werden
-y_mess = torch.tensor(4.0)                     # Messwert
+x = torch.tensor(2.0)                       # Eingabe
+w = torch.tensor(1.5, requires_grad=True)   # Gewicht, wird beobachtet
+y_mess = torch.tensor(4.0)                  # Messwert
 
-y_modell = w * x                               # Vorhersage des Modells
-loss = (y_modell - y_mess) ** 2                # quadratischer Fehler
-
-loss.backward()
+y_modell = w * x                            # Vorhersage
+loss = (y_modell - y_mess)**2               # quadratischer Fehler
 print(loss)
+```
+
+Die Ausgabe enthält neben dem Wert Der Verlustfunktion `1.` einen unscheinbaren
+Zusatz: `grad_fn=<PowBackward0>`. Er verrät, dass PyTorch beim Quadrieren nicht
+nur das Ergebnis berechnet, sondern sich auch gemerkt hat, *welche* Operation
+das Ergebnis erzeugt hat (eine Potenz, englisch: "Power"). Dasselbe gilt für die
+Multiplikation davor. Aus diesen Protokolleinträgen entsteht Schritt für Schritt
+eine Kette, genauer ein Netz von Operationen: der **Berechnungsgraph**
+(englisch: "Computational Graph"). Er hält fest, wie der Ausgabewert aus den
+Eingangsgrößen entstanden ist, und ist damit genau die Struktur, an der die
+Kettenregel entlanglaufen kann. Dieses automatische Ableiten entlang des Graphen
+heißt in PyTorch **Autograd**.
+
+% TODO Abbildung: Berechnungsgraph als TikZ (Netzarchitektur-Stile aus den
+% Instruktionen, Datenfluss von links nach rechts). Vorschlag: zweipaneliger
+% Aufbau, links das Ein-Gewicht-Beispiel (x, w, y_modell, y_mess, Loss),
+% rechts das Mini-Netz aus Kapitel 3 (x, w1, b1, sigmoid, h, w2, b2, y_dach,
+% Loss); den Pfad der Kettenregel zu w bzw. w1 mit connection highlight.
+% Einbindung dann über:
+%```{figure} pics/chapter04_sec01_fig01.svg
+%:name: fig-berechnungsgraph
+%Der Berechnungsgraph: links das Ein-Gewicht-Beispiel, rechts das Mini-Netz
+%aus Kapitel 3.
+%```
+
+Den Anstoß zur eigentlichen Gradientenberechnung gibt die Methode
+`backward()`: Sie läuft den Berechnungsgraphen von hinten nach vorn ab (daher
+der Name) und wendet dabei an jedem Knoten die Kettenregel an. Das Ergebnis
+landet im Attribut `.grad` der beobachteten Variablen:
+
+% Lücke (Präsenz): die Zeile `loss.backward()`
+
+```{code-cell} python
+loss.backward()
 print(w.grad)
 ```
 
-Prüfen wir das mit der Handrechnung nach. Die Loss ist $L(w) = (wx - y)^2$, also
-gilt nach der Kettenregel
+Prüfen wir das mit der Handrechnung nach. Die Verlustfunktion ist $L(w) = (wx -
+y)^2$, also gilt nach der Kettenregel
 
 $$\frac{\partial L}{\partial w} = 2\,(wx - y)\cdot x
 = 2 \cdot (1.5 \cdot 2 - 4) \cdot 2 = -4.$$
 
-Genau diesen Wert finden wir nach dem Aufruf von `backward()` im Attribut
-`w.grad`. Das negative Vorzeichen sagt uns: Vergrößern wir `w`, sinkt die Loss.
-Eine wichtige Beobachtung am Rande: Nur Tensoren, die wir selbst mit
-`requires_grad=True` angelegt haben, erhalten ein gefülltes `.grad`.
+Genau dieser Wert steht nach dem Aufruf von `backward()` in `w.grad`. Das
+negative Vorzeichen können wir sofort deuten: Vergrößern wir `w`, sinkt der Wert
+der Verlustfunktion. Eine wichtige Beobachtung am Rande: Nur Tensoren, die wir
+selbst mit `requires_grad=True` angelegt haben, erhalten ein gefülltes `.grad`.
 Zwischenergebnisse wie `y_modell` tauchen zwar im Berechnungsgraphen auf, ihre
-Gradienten werden aber nach Gebrauch wieder verworfen.
-
-### Gradienten akkumulieren
-
-Eine Eigenheit von Autograd müssen wir jetzt schon kennen, weil sie uns in der
-nächsten Sektion als häufigster Anfängerfehler wiederbegegnet: `backward()`
-**überschreibt** das Attribut `.grad` nicht, sondern **addiert** den neuen
-Gradienten auf den alten. *Was passiert also, wenn wir dieselbe Rechnung zweimal
-hintereinander ausführen?*
-
-```{code-cell} python
-w = torch.tensor(1.5, requires_grad=True)
-x = torch.tensor(2.0)
-y_mess = torch.tensor(4.0)
-
-for durchlauf in range(2):
-    loss = ((w * x) - y_mess) ** 2
-    loss.backward()
-    print(f"Durchlauf {durchlauf + 1}: w.grad = {w.grad}")
-```
-
-Nach dem zweiten Durchlauf steht in `w.grad` der Wert $-8$, also die Summe aus
-zweimal $-4$. Der Gradient selbst hat sich nicht geändert, nur die Buchhaltung
-ist falsch. Wollen wir frisch rechnen, müssen wir den Speicher vorher leeren,
-zum Beispiel mit `w.grad.zero_()`. In der Trainingsschleife (englisch: "Training
-Loop") der nächsten Sektion übernimmt das eine eigene Zeile, und wir werden
-sehen, was passiert, wenn man sie vergisst.
-
-## Verifikation: Handrechnung vs. Autograd
-
-Trauen wir Autograd auch bei einem etwas größeren Beispiel? Nehmen wir das
-Mini-Netz aus Kapitel 3 wieder auf: eine Eingabe $x$, ein verborgenes Neuron mit
-ReLU-Aktivierung und ein Ausgabeneuron, also
-
-$$h = \mathrm{ReLU}(w_1 x), \qquad y = w_2 \, h, \qquad L = (y - t)^2.$$
-
-Mit den Zahlen $x = 2$, $w_1 = 0.5$, $w_2 = 3$ und Zielwert $t = 2$ liefert
-die Handrechnung (die ReLU ist hier aktiv, ihre Ableitung also 1):
-
-$$\frac{\partial L}{\partial w_2} = 2\,(y - t)\cdot h = 2 \cdot 1 \cdot 1 = 2,
-\qquad \frac{\partial L}{\partial w_1} = 2\,(y - t)\cdot w_2 \cdot x
-= 2 \cdot 1 \cdot 3 \cdot 2 = 12.$$
-
-Nun dieselbe Rechnung mit Autograd:
-
-```{code-cell} python
-x = torch.tensor(2.0)
-t = torch.tensor(2.0)
-w1 = torch.tensor(0.5, requires_grad=True)
-w2 = torch.tensor(3.0, requires_grad=True)
-
-h = torch.relu(w1 * x)
-y = w2 * h
-loss = (y - t) ** 2
-
-loss.backward()
-print(f"dL/dw1 = {w1.grad}")
-print(f"dL/dw2 = {w2.grad}")
-```
-
-Beide Werte stimmen mit der Handrechnung überein. Das ist mehr als eine
-Spielerei: Dieser Abgleich zwischen einer unabhängigen Referenzrechnung und dem
-Werkzeug ist dieselbe Verifikationsstrategie, mit der wir auch ein FEM-Modell
-gegen eine analytische Lösung prüfen würden. In Übung 4.2 führen Sie diesen
-Abgleich selbst für die Funktion aus Übung 3.4 durch.
+Gradienten werden aber nach Gebrauch wieder verworfen. Halten wir den Dreiklang
+fest, denn er kehrt in jedem Training wieder: `requires_grad=True` meldet
+Variablen an, die Vorwärtsrechnung baut den Berechnungsgraphen auf, `backward()`
+füllt die `.grad`-Attribute.
 
 ```{admonition} Mini-Übung
 :class: tip
-Ändern Sie in der Zelle oben den Wert von `w1` auf `-0.5` und überlegen Sie vor
-dem Ausführen: Welche beiden Gradienten erwarten Sie jetzt?
+Berechnen Sie mit Autograd die Ableitung der Funktion $f(x) = x^3 + 2x$ an der
+Stelle $x = 2$. Rechnen Sie zuerst von Hand nach, welcher Wert herauskommen
+muss, und prüfen Sie dann mit PyTorch.
 ```
 
 ```{code-cell} python
 # Code-Zelle
+```
 
+````{admonition} Lösung
+:class: tip
+:class: dropdown
+Von Hand: $f'(x) = 3x^2 + 2$, also $f'(2) = 14$.
+
+```python
+x = torch.tensor(2.0, requires_grad=True)
+f = x**3 + 2*x
+f.backward()
+print(x.grad)
+```
+
+Die Ausgabe ist `tensor(14.)` und bestätigt die Handrechnung.
+````
+
+Jetzt zum eigentlichen Härtetest: unserem Mini-Netz aus Kapitel 3. Zur
+Erinnerung: Ein Eingang $x = 2$ läuft in ein verstecktes Neuron mit der
+Sigmoid-Aktivierung, dessen Ausgang $h$ in ein lineares Ausgabeneuron. Die vier
+Parameter waren $w_1 = 0.5$, $b_1 = 0$, $w_2 = -0.3$ und $b_2 = 0.1$, der
+Zielwert $y = 1$, die Verlustfunktion der quadratischen Fehler. Unsere
+Handrechnung über die Kettenregel hatte folgende Gradienten ergeben:
+
+% TODO: Zahlenwerte und Notation mit der endgültigen Fassung von Kapitel 3
+% abgleichen (hier gerundet auf vier Nachkommastellen).
+
+| Parameter | Gradient (Handrechnung) |
+| --------- | ----------------------- |
+| $w_1$     | 0.2641                  |
+| $b_1$     | 0.1320                  |
+| $w_2$     | -1.6366                 |
+| $b_2$     | -2.2386                 |
+
+Dieselbe Rechnung in PyTorch: Wir legen die vier Parameter mit
+`requires_grad=True` an, schreiben die Vorwärtsrechnung als ganz gewöhnliche
+Python-Zeilen und überlassen den Rest Autograd.
+
+% Lücke (Präsenz): die vier `requires_grad=True`-Argumente sowie die Zeile
+% `loss.backward()`
+
+```{code-cell} python
+x = torch.tensor(2.0)
+y_wahr = torch.tensor(1.0)
+
+w1 = torch.tensor(0.5, requires_grad=True)
+b1 = torch.tensor(0.0, requires_grad=True)
+w2 = torch.tensor(-0.3, requires_grad=True)
+b2 = torch.tensor(0.1, requires_grad=True)
+
+h = torch.sigmoid(w1 * x + b1)
+y_dach = w2 * h + b2
+loss = (y_dach - y_wahr)**2
+print(f'Verlustfunktion: {loss.item():.4f}')
+
+loss.backward()
+print(f'Gradient w1: {w1.grad.item():.4f}')
+print(f'Gradient b1: {b1.grad.item():.4f}')
+print(f'Gradient w2: {w2.grad.item():.4f}')
+print(f'Gradient b2: {b2.grad.item():.4f}')
+```
+
+Alle vier Werte stimmen Ziffer für Ziffer mit der Tabelle überein. Die halbe
+Seite Kettenregel aus Kapitel 3 steckt in einer einzigen Zeile:
+`loss.backward()`. Das ist mehr als eine Spielerei: Dieser Abgleich zwischen
+einer unabhängigen Referenzrechnung und dem Werkzeug ist dieselbe
+Verifikationsstrategie, mit der wir auch ein FEM-Modell gegen eine analytische
+Lösung prüfen würden. Die Methode `.item()` haben wir dabei nebenbei
+kennengelernt: Sie holt aus einem Tensor mit genau einem Element die
+gewöhnliche Python-Zahl heraus, was die formatierte Ausgabe erleichtert. Und
+das Beste: Dieses Vorgehen skaliert. Ob vier Parameter oder vier Millionen, ob
+unsere kleine Formel oder ein Netz mit fünfzig Schichten, der Ablauf bleibt
+identisch, nur der Berechnungsgraph wird größer.
+
+% Live-Frage: Was passiert mit den Gradienten, wenn wir w1 = 10 setzen?
+% (Antwort: Sigmoid sättigt, w1.grad und b1.grad werden null; nur stellen,
+% falls Zeit ist, sonst Verweis auf das Skript)
+
+```{admonition} Mini-Übung
+:class: tip
+Legen Sie das Mini-Netz aus der letzten Zelle noch einmal an, diesmal aber mit
+`w1 = 10.0` statt `0.5`. Überlegen Sie vor dem Ausführen: Der Ausgang des
+versteckten Neurons ist $h = \sigma(20)$. Welchen Wert hat $h$ ungefähr, und
+welche Gradienten erwarten Sie für die vier Parameter?
+```
+
+```{code-cell} python
+# Code-Zelle
+```
+
+````{admonition} Lösung
+:class: tip
+:class: dropdown
+```python
+w1 = torch.tensor(10.0, requires_grad=True)
+b1 = torch.tensor(0.0, requires_grad=True)
+w2 = torch.tensor(-0.3, requires_grad=True)
+b2 = torch.tensor(0.1, requires_grad=True)
+
+h = torch.sigmoid(w1 * x + b1)
+y_dach = w2 * h + b2
+loss = (y_dach - y_wahr)**2
+loss.backward()
+
+print(f'h = {h.item()}')
+print(f'Gradient w1: {w1.grad.item()}')
+print(f'Gradient b1: {b1.grad.item()}')
+print(f'Gradient w2: {w2.grad.item():.4f}')
+print(f'Gradient b2: {b2.grad.item():.4f}')
+```
+
+Die Sigmoid-Funktion **sättigt**: Für große Eingaben liegt ihr Ausgang so nah an
+1, dass in `float32` sogar exakt `h = 1.0` herauskommt, und ihre Steigung ist
+dort null. Über die Kettenregel werden damit auch die Gradienten von `w1` und
+`b1` exakt null, obwohl die Verlustfunktion mit 1.44 sogar größer ist als
+vorher. Das Neuron bekommt kein Signal mehr, in welche Richtung es sich
+verbessern soll, und lernt nichts. Die Gradienten von `w2` und `b2` (jeweils
+-2.4) sind davon nicht betroffen, denn sie liegen im Berechnungsgraphen hinter
+der Sättigung. Dieses Phänomen wird uns bei den Aktivierungsfunktionen als
+verschwindender Gradient wiederbegegnen.
+````
+
+## Was Autograd übernimmt und was nicht
+
+% Video 3 (ca. 4-5 min). Präsenz: ca. 4 min, direkte Vorbereitung der
+% Studio-Aufgabe.
+
+Autograd nimmt uns das Ableiten ab, aber nicht das Denken. Zwei Eigenheiten
+müssen wir kennen, bevor wir zum ersten Mal selbst trainieren, und beide sind
+häufige Fehlerquellen in echten Projekten.
+
+*Was passiert eigentlich, wenn wir dieselbe Rechnung zweimal hintereinander
+ableiten?*
+
+% Live-Frage: Vermutung einholen, bevor die Zelle ausgeführt wird
+% (typische falsche Antwort: es bleibt bei -4).
+
+````{admonition} Mini-Übung
+:class: tip
+Was gibt die folgende Schleife aus? Stellen Sie zuerst eine Vermutung auf und
+prüfen Sie dann in der Code-Zelle.
+
+```python
+w = torch.tensor(1.5, requires_grad=True)
+for durchlauf in range(2):
+    loss = (w * x - y_mess)**2
+    loss.backward()
+    print(w.grad)
+```
+````
+
+```{code-cell} python
+# Code-Zelle
 ```
 
 ```{admonition} Lösung
 :class: tip
 :class: dropdown
-Mit `w1 = -0.5` ist das Argument der ReLU negativ, die ReLU "klemmt ab" und
-liefert `h = 0`. Damit ist die Ableitung der ReLU an dieser Stelle 0, und es
-folgt `w1.grad = 0`. Auch `w2.grad = 2*(y - t)*h = 2*(-2)*0 = 0` verschwindet,
-weil `h = 0` ist. Beide Gradienten sind null, obwohl die Loss mit 4 deutlich
-größer ist als vorher: Das Neuron ist "tot" und lernt nichts mehr. Dieses
-Phänomen wird uns bei den Aktivierungsfunktionen wieder begegnen.
+Die Ausgabe ist `tensor(-4.)` und dann `tensor(-8.)`. PyTorch überschreibt
+`.grad` nicht, sondern **addiert** jeden neu berechneten Gradienten auf den
+alten Wert. Nach dem zweiten Durchlauf steht deshalb die Summe aus zweimal -4
+im Attribut, obwohl sich an der Rechnung nichts geändert hat.
 ```
 
-## Was Autograd uns abnimmt und was nicht
+PyTorch **akkumuliert** Gradienten: Jeder Aufruf von `backward()` addiert auf
+das, was bereits in `.grad` steht. Schauen wir uns das am Ein-Gewicht-Beispiel
+direkt an:
 
-Autograd nimmt uns genau eine Sache ab, diese aber vollständig: das Herleiten und Ausrechnen von Ableitungen, egal wie verschachtelt die Rechnung ist. Wir müssen nie wieder eine Kettenregel für ein Netz von Hand aufschreiben, und wenn wir die Architektur ändern, ändert sich der Berechnungsgraph automatisch mit.
+```{code-cell} python
+w = torch.tensor(1.5, requires_grad=True)
+for durchlauf in range(2):
+    loss = (w * x - y_mess)**2
+    loss.backward()
+    print(w.grad)
+```
 
-Alles andere bleibt unsere Aufgabe. Autograd entscheidet nicht, welche Loss-Funktion zum Problem passt, wie das Netz aufgebaut sein soll oder wie groß die Schrittweite beim Anpassen der Gewichte sein darf. Autograd **aktualisiert auch keine Gewichte**: Es stellt nur die Gradienten bereit. Den eigentlichen Optimierungsschritt, also das Drehen an den Gewichten in Richtung des negativen Gradienten, müssen wir selbst anstoßen. Und schließlich schützt Autograd nicht vor inhaltlichen Fehlern: Ein falsch zusammengebautes Modell wird mit perfekter Präzision in die falsche Richtung abgeleitet.
+Beim zweiten Durchlauf steht -8 statt -4 im Gradienten. Der Gradient selbst
+hat sich nicht geändert, nur die Buchhaltung ist falsch, und in einer
+Trainingsschleife würden sich so die Gradienten aller bisherigen Schritte
+aufsummieren und das Training in eine falsche Richtung lenken. Vor jedem neuen
+`backward()` müssen wir die Gradienten deshalb ausdrücklich auf null setzen.
+Für einen einzelnen Tensor erledigt das die Methode `grad.zero_()`; der
+Unterstrich am Ende ist die PyTorch-Konvention für Methoden, die den Tensor
+direkt an Ort und Stelle verändern:
+
+% Lücke (Präsenz): die Zeile `w.grad.zero_()`
+
+```{code-cell} python
+w.grad.zero_()
+print(w.grad)
+```
+
+Die zweite Eigenheit betrifft den Update-Schritt selbst. Aus Kapitel 3 kennen
+wir das Rezept des Gradientenabstiegs: neuer Wert gleich alter Wert minus
+Lernrate mal Gradient. Diese Subtraktion ist aber auch nur eine Rechnung mit
+einem beobachteten Tensor, und Autograd würde sie pflichtbewusst in den
+Berechnungsgraphen aufnehmen, obwohl sie mit der Verlustfunktion nichts zu tun
+hat. Für solche Buchhaltungsschritte gibt es den Kontext `torch.no_grad()`:
+Alles, was darin passiert, wird nicht protokolliert. Ein einzelner
+Abstiegsschritt für unser Ein-Gewicht-Beispiel mit der Lernrate 0.1 sieht
+so aus:
+
+% Lücke (Präsenz): der Update-Schritt innerhalb von torch.no_grad()
+
+```{code-cell} python
+w = torch.tensor(1.5, requires_grad=True)
+loss = (w * x - y_mess)**2
+loss.backward()
+
+with torch.no_grad():
+    w -= 0.1 * w.grad
+w.grad.zero_()
+
+print(w)
+```
+
+Aus 1.5 wird 1.9: Das negative Vorzeichen des Gradienten hat das Gewicht
+vergrößert, genau wie wir es oben vorhergesagt haben, und zwar in Richtung des
+perfekten Werts 2 (denn $2 \cdot 2 = 4$ träfe den Messwert exakt). Die
+Verlustfunktion fällt durch diesen einen Schritt von 1 auf 0.04. Dank
+`torch.no_grad()` bleibt der Berechnungsgraph von der Buchhaltung unberührt.
+
+Damit ist die Arbeitsteilung klar. Autograd nimmt uns genau eine Sache ab, diese
+aber vollständig: das Herleiten und Ausrechnen von Ableitungen, egal wie
+verschachtelt die Rechnung ist, und bei jeder Änderung der Architektur ändert
+sich der Berechnungsgraph automatisch mit. Alles andere bleibt unsere Aufgabe:
+die Architektur des Netzes, die Wahl der Verlustfunktion, die Wahl der Lernrate
+und die Trainingsschleife aus Vorwärtsrechnung, `backward()`, Update-Schritt und
+Nullsetzen der Gradienten. Autograd aktualisiert insbesondere keine Gewichte, es
+stellt nur die Gradienten bereit. Und es schützt nicht vor inhaltlichen Fehlern:
+Ein falsch zusammengebautes Modell wird mit perfekter Präzision in die falsche
+Richtung abgeleitet.
+
+## Aufgaben
+
+Zum Abschluss wenden wir alle Bausteine dieses Kapitels in einer
+zusammenhängenden Aufgabe an. Sie ist für die Bearbeitung in Kleingruppen
+im Studio-Teil des Termins gedacht (etwa 15 Minuten); die Teilaufgaben folgen
+genau der Reihenfolge, in der wir die Bausteine kennengelernt haben.
+
+````{admonition} Übung (✩✩): Federkennlinie mit Autograd
+:class: tip
+Im Prüflabor wurde unsere Schraubenfeder vermessen: zu 20 Auslenkungen $s$
+(in Millimetern) liegt jeweils die gemessene Rückstellkraft $F$ (in Newton)
+vor. Das physikalische Modell ist eine Gerade $F = k \cdot s + F_0$ mit der
+Federsteifigkeit $k$ und der Vorspannkraft $F_0$. Beide Parameter sollen per
+Gradientenabstieg aus den Messdaten bestimmt werden. Verwenden Sie das
+folgende Gerüst:
+
+```python
+import torch
+
+torch.manual_seed(42)
+s = torch.linspace(0, 10, 20)                 # Auslenkung in mm
+F = 0.8 * s + 2.0 + 0.4 * torch.randn(20)     # gemessene Kraft in N
+
+# Teilaufgabe 1: Parameter anlegen
+k = ...   # IHR CODE HIER
+F0 = ...  # IHR CODE HIER
+
+# Teilaufgabe 2: Vorhersage und Verlustfunktion
+# IHR CODE HIER
+
+# Teilaufgabe 3: Gradienten berechnen und ausgeben
+# IHR CODE HIER
+
+# Teilaufgabe 4: ein Update-Schritt (Lernrate 0.01), Gradienten nullen
+# IHR CODE HIER
+```
+
+1. Legen Sie die Parameter `k` und `F0` als Tensoren mit dem Startwert 0 an,
+   sodass Autograd sie beobachtet.
+2. Berechnen Sie die Vorhersage $F_{\text{pred}} = k \cdot s + F_0$ und als
+   Verlustfunktion den mittleren quadratischen Fehler `loss = ((F_pred -
+   F)**2).mean()`. Lassen Sie sich den Wert der Verlustfunktion ausgeben.
+3. Berechnen Sie die Gradienten und lassen Sie sich `k.grad` und `F0.grad`
+   ausgeben. Deuten Sie die Vorzeichen: In welche Richtung wird der nächste
+   Update-Schritt die beiden Parameter verändern, und ist das physikalisch
+   plausibel?
+4. Führen Sie einen Update-Schritt mit der Lernrate 0.01 aus und setzen Sie
+   anschließend die Gradienten auf null. Woran müssen Sie beim Update-Schritt
+   denken?
+5. **Zusatzaufgabe:** Packen Sie die Teilaufgaben 2 bis 4 in eine Schleife mit
+   1000 Durchläufen. Lassen Sie sich am Ende `k` und `F0` ausgeben und
+   vergleichen Sie mit den wahren Werten, die in der Datenerzeugung stecken.
+   Stellen Sie die Messpunkte und die gefittete Gerade mit Plotly dar.
+````
+
+```{code-cell} python
+# Code-Zelle
+```
+
+````{admonition} Lösung
+:class: tip
+:class: dropdown
+```python
+import torch
+
+torch.manual_seed(42)
+s = torch.linspace(0, 10, 20)                 # Auslenkung in mm
+F = 0.8 * s + 2.0 + 0.4 * torch.randn(20)     # gemessene Kraft in N
+
+# Teilaufgabe 1: Parameter anlegen
+k = torch.tensor(0.0, requires_grad=True)
+F0 = torch.tensor(0.0, requires_grad=True)
+
+# Teilaufgabe 2: Vorhersage und Verlustfunktion
+F_pred = k * s + F0
+loss = ((F_pred - F)**2).mean()
+print(f'Verlust: {loss.item():.4f}')
+
+# Teilaufgabe 3: Gradienten berechnen und ausgeben
+loss.backward()
+print(f'Gradient k:  {k.grad.item():.4f}')
+print(f'Gradient F0: {F0.grad.item():.4f}')
+
+# Teilaufgabe 4: ein Update-Schritt, Gradienten nullen
+with torch.no_grad():
+    k -= 0.01 * k.grad
+    F0 -= 0.01 * F0.grad
+k.grad.zero_()
+F0.grad.zero_()
+```
+
+Zu Teilaufgabe 3: Beide Gradienten sind negativ. Der Update-Schritt subtrahiert
+die Gradienten, negative Gradienten vergrößern also die Parameter. Das ist
+plausibel: Mit den Startwerten null sagt das Modell überall die Kraft null
+voraus und liegt damit unter allen Messwerten, also müssen sowohl die
+Steifigkeit `k` als auch die Vorspannkraft `F0` wachsen.
+
+Zu Teilaufgabe 4: Der Update-Schritt gehört in einen `torch.no_grad()`-Block,
+damit er nicht selbst im Berechnungsgraphen landet. Ohne das anschließende
+Nullsetzen würden sich die Gradienten über die Schleifendurchläufe der
+Zusatzaufgabe aufsummieren und der Fit misslingt.
+
+```python
+# Teilaufgabe 5 (Zusatz): Trainingsschleife und Plot
+import plotly.graph_objects as go
+
+torch.manual_seed(42)
+s = torch.linspace(0, 10, 20)
+F = 0.8 * s + 2.0 + 0.4 * torch.randn(20)
+
+k = torch.tensor(0.0, requires_grad=True)
+F0 = torch.tensor(0.0, requires_grad=True)
+learning_rate = 0.01
+
+for schritt in range(1000):
+    F_pred = k * s + F0
+    loss = ((F_pred - F)**2).mean()
+    loss.backward()
+    with torch.no_grad():
+        k -= learning_rate * k.grad
+        F0 -= learning_rate * F0.grad
+    k.grad.zero_()
+    F0.grad.zero_()
+
+print(f'k  = {k.item():.4f} N/mm')
+print(f'F0 = {F0.item():.4f} N')
+
+fig = go.Figure()
+fig.add_scatter(x=s.numpy(), y=F.numpy(), mode='markers', name='Messwerte')
+fig.add_scatter(x=s.numpy(), y=(k * s + F0).detach().numpy(),
+                mode='lines', name='gefittete Gerade')
+fig.update_layout(xaxis_title='Auslenkung s in mm',
+                  yaxis_title='Kraft F in N',
+                  title='Federkennlinie: Messwerte und Fit')
+fig.show()
+```
+
+Die gefitteten Parameter liegen nahe an den wahren Werten aus der Datenerzeugung
+(Federsteifigkeit 0.8 N/mm und Vorspannkraft 2 N); wegen des Messrauschens
+treffen sie sie nicht exakt, und das sollen sie auch nicht. Vor dem Plotten muss
+die Vorhersage mit `.detach()` aus dem Berechnungsgraphen gelöst werden, denn
+`.numpy()` funktioniert nur für Tensoren, die Autograd nicht beobachtet. Wer
+diese Schleife verstanden hat, hat das Grundgerüst jedes PyTorch-Trainings
+verstanden. Im nächsten Kapitel lassen wir uns genau diese Buchhaltung von
+PyTorch abnehmen.
+````
 
 ## Zusammenfassung und Ausblick
 
-In dieser Sektion haben wir die beiden Grundbausteine von PyTorch kennengelernt. Tensoren sind das Gegenstück zu NumPy-Arrays, mit `float32` als Standard-Datentyp und `.shape` als wichtigstem Diagnosewerkzeug. Autograd protokolliert alle Rechnungen in einem Berechnungsgraphen und liefert mit `backward()` exakt die Gradienten, die wir in Kapitel 3 mühsam von Hand hergeleitet haben. Dabei haben wir zwei Stolpersteine markiert: Gradienten akkumulieren sich über mehrere `backward()`-Aufrufe, und Autograd berechnet Gradienten, aktualisiert aber keine Gewichte. Beides löst die nächste Sektion auf: Dort fügen wir Modell, Loss, Gradient und Update zur vollständigen Trainingsschleife zusammen, dem Herzstück jedes Deep-Learning-Projekts.
+In diesem Kapitel haben wir die beiden Grundbausteine von PyTorch kennengelernt.
+Tensoren speichern unsere Daten als Zahlenschemata mit beliebig vielen
+Dimensionen, rechnen elementweise wie NumPy-Arrays und lassen sich über
+`torch.from_numpy` und `.numpy()` verlustfrei mit NumPy austauschen. Autograd
+protokolliert jede Rechnung mit beobachteten Tensoren im Berechnungsgraphen und
+liefert auf `backward()` alle Gradienten frei Haus; am Mini-Netz aus Kapitel 3
+haben wir nachgeprüft, dass sie Ziffer für Ziffer mit unserer Handrechnung
+übereinstimmen. Zwei Dinge bleiben dabei unsere Verantwortung: die Gradienten
+vor jedem neuen `backward()` auf null zu setzen und den Update-Schritt in
+`torch.no_grad()` zu verpacken. *Aber müssen wir diese Buchhaltung wirklich für
+jedes Gewicht einzeln erledigen?* Natürlich nicht: Im nächsten Kapitel
+übernehmen `torch.nn` und die Optimierer aus `torch.optim` genau diese Arbeit,
+und aus unserer handgeschriebenen Schleife wird das Standardrezept jedes
+PyTorch-Trainings.

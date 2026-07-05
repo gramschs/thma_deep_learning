@@ -13,7 +13,10 @@ Umsetzung abgestimmt.
 Dateinamen folgen dem Schema `chapterXX_secXX.md`, also zum Beispiel
 `chapter01_sec01.md` für das erste Jupyter Notebook der ersten Woche.
 Ein Kapitel entspricht einer Vorlesungswoche. Die letzte Sektion eines
-Kapitels enthält die nummerierten Übungen.
+Kapitels enthält die nummerierten Übungen. Ausnahme: Sektionen im
+Studio-Format (siehe Abschnitt 2) enthalten ihre eigene nummerierte
+Studio-Aufgabe direkt am Sektionsende, unabhängig davon, an welcher
+Stelle im Kapitel die Sektion steht.
 
 ### YAML-Header
 
@@ -38,7 +41,10 @@ Jede Sektion folgt dieser festen Abfolge:
    Gesamtworkflow einordnet.
 3. **`## Lernziele`** mit der Lernziel-Box
 4. Inhaltliche Unterabschnitte
-5. **`## Zusammenfassung und Ausblick`**
+5. **`## Aufgaben`** (nur in Sektionen im Studio-Format): die
+   nummerierte Studio-Aufgabe für die Kleingruppenarbeit (siehe
+   Abschnitt 2 und Abschnitt 6).
+6. **`## Zusammenfassung und Ausblick`**
 
 ### Lernziele
 
@@ -50,11 +56,10 @@ Die Lernziele werden durch folgende Admonition hervorgehoben:
 * [ ] Lernziel 2
 ```
 
-Lernziele werden **operationalisierbar** formuliert, nicht deklarativ:
-„Sie können ein Training mit divergierender Loss diagnostizieren" statt
-„Sie kennen Optimierer". Die Lernziele aller Sektionen bilden zusammen
-die Checkliste für die Rechnerklausur; jedes Lernziel muss prinzipiell
-prüfbar sein.
+Lernziele werden **operationalisierbar** formuliert, nicht deklarativ: „Sie
+können ein Training mit divergierender Verlustfunktion diagnostizieren" statt
+„Sie kennen Optimierer". Die Lernziele aller Sektionen bilden zusammen die
+Checkliste für die Rechnerklausur; jedes Lernziel muss prinzipiell prüfbar sein.
 
 ### Abschluss jeder Sektion
 
@@ -68,7 +73,104 @@ Kurzer Rückblick auf die Inhalte und Vorschau auf das nächste Kapitel.
 
 ---
 
-## 2. Sprache und Stil
+## 2. Das Studio-Format: Zwei Exporte aus einer Quelldatei
+
+Einige Sektionen werden im **Studio-Format** gehalten: ein Code-along
+von etwa 25 Minuten im Termin, gefolgt von einer Kleingruppenarbeit von
+etwa 15 Minuten an einer Studio-Aufgabe. Für dieses Format entstehen aus
+derselben Quelldatei zwei unterschiedliche Jupyter-Notebook-Exporte für
+zwei Zielgruppen; die Quelldatei selbst bleibt in jedem Fall die
+Musterlösung mit gefüllten Zellen, wie sie auch in der HTML-Version auf
+GitHub Pages erscheint.
+
+### Die beiden Exporte
+
+**Selbststudium-Notebook** (für Studierende, die nicht in Präsenz
+teilnehmen): entspricht der Quelldatei nahezu unverändert. Alle
+Kernzellen sind gefüllt (Musterlösung), alle Mini-Übungen bleiben
+enthalten und dienen als Vorhersage- und Selbstkontrollmomente beim
+eigenständigen Durcharbeiten.
+
+**Präsenz-Notebook** (für den gemeinsamen Termin): Mini-Übungen werden
+entfernt, denn die aktive Auseinandersetzung mit dem Stoff entsteht hier
+live im Termin und anschließend in der Studio-Aufgabe. Stattdessen
+erhalten ausgewählte Zeilen in den Kernzellen Lücken nach der
+Lücken-Konvention (Abschnitt 5): Die Studierenden füllen sie gemeinsam
+mit der Lehrperson im Termin.
+
+Beide Exporte entstehen automatisiert aus derselben Quelldatei.
+
+### Deckungsgleichheit von Lücken und Mini-Übungen
+
+Lücken im Präsenz-Notebook und Mini-Übungen im Selbststudium-Notebook
+sollen dieselben Schlüsselstellen einer Sektion treffen. Wer die
+Mini-Übung zu einer Codezeile im Selbststudium löst, soll dieselbe Zeile
+im Präsenztermin als Lücke aktiv ausfüllen. So üben beide Gruppen an
+denselben Konzepten, nur in unterschiedlicher Sozialform.
+
+### MyST-Kommentare zur Steuerung der Exporte
+
+Die folgenden MyST-Kommentare (`% ...`) steuern die Erzeugung der
+Exporte beziehungsweise dokumentieren Regieanweisungen für den Termin.
+Sie erscheinen in keinem der drei Ausgabeformate (HTML,
+Selbststudium-Notebook, Präsenz-Notebook) und dienen ausschließlich dem
+Exportwerkzeug und der Lehrperson.
+
+`% Lücke (Präsenz): <Beschreibung>` steht unmittelbar vor der
+betroffenen Code-Zelle und markiert, welche Zeile(n) im Präsenz-Export
+durch `# IHR CODE HIER` und `...` ersetzt werden:
+
+````markdown
+% Lücke (Präsenz): die Zeile `loss.backward()`
+
+```{code-cell} python
+...
+loss.backward()
+...
+```
+````
+
+`% Live-Frage: <Frage> (Antwort: ...)` dokumentiert die mündliche
+Vorhersagefrage, mit der die Lehrperson im Präsenztermin die dort
+entfallende Mini-Übung ersetzt. Der Kommentar ist reine Regieanweisung
+und wird nie exportiert.
+
+`% Präsenz: <Anweisung>` dokumentiert sonstige Regieanweisungen zur
+Zeitsteuerung im Termin, zum Beispiel welche Zellen im Termin nur
+gezeigt und nicht gemeinsam eingetippt werden.
+
+### Zeitbudget
+
+Jede Sektion im Studio-Format dokumentiert ihr Gesamtzeitbudget als
+Kommentar direkt nach dem H1-Titel:
+
+```markdown
+% Zeitbudget Präsenz (Code-along gesamt ca. 25 min): Video-1-Stoff ca. 9 min,
+% Video-2-Stoff ca. 12 min, Video-3-Stoff ca. 4 min; danach Studio-Aufgabe.
+```
+
+### Gliederung nach Erklärvideos
+
+Sektionen im Studio-Format werden zusätzlich mit Erklärvideos begleitet,
+im Regelfall ein Video pro inhaltlichem H2-Abschnitt. Damit die Videos
+in sich abgeschlossen bleiben und nicht zu kleinteilig werden, werden
+inhaltliche Unterabschnitte auf maximal drei bis vier H2-Blöcke
+konsolidiert, auch wenn das bedeutet, eng zusammenhängende Konzepte
+(zum Beispiel eine Kernidee und ihr unmittelbarer Anwendungsfall) in
+einem gemeinsamen Abschnitt statt in getrennten Abschnitten zu
+behandeln. Jeder H2-Abschnitt erhält direkt unter der Überschrift einen
+Kommentar mit Videonummer, geschätzter Videolänge und dem
+Präsenz-Zeitbudget dieses Abschnitts:
+
+```markdown
+## Autograd: PyTorch rechnet die Gradienten
+
+% Video 2 (ca. 10-12 min). Präsenz: ca. 12 min inklusive Lücken.
+```
+
+---
+
+## 3. Sprache und Stil
 
 ### Grundsätze
 
@@ -76,8 +178,7 @@ Kurzer Rückblick auf die Inhalte und Vorschau auf das nächste Kapitel.
 - Fachbegriffe auf Englisch werden beim ersten Auftreten erklärt.
 - Englische Fachbegriffe, die im deutschen Satz als Nomen verwendet
   werden, werden großgeschrieben, auch wenn sie aus mehreren Wörtern
-  bestehen (zum Beispiel: Learning Rate, Weight Decay, Batch Size,
-  Transfer Learning). Das gilt auch für englische Nomen in Klammern als
+  bestehen. Das gilt auch für englische Nomen in Klammern als
   Übersetzungsangabe (zum Beispiel: `(englisch: "Loss")`).
   Wird ein englisches Wort hingegen als Prädikatsadjektiv verwendet,
   bleibt es klein (zum Beispiel: „das Modell ist overfittet").
@@ -92,15 +193,13 @@ Kurzer Rückblick auf die Inhalte und Vorschau auf das nächste Kapitel.
 
 ### Deutsch vor Englisch bei etablierten Entsprechungen
 
-Englische Fachbegriffe werden nur dort verwendet, wo im
-deutschsprachigen Raum keine etablierte Entsprechung existiert (zum
-Beispiel: Learning Rate, Batch Size, Weight Decay). Existiert eine den
-Studierenden vertraute deutsche Entsprechung, wird durchgängig diese
-verwendet. Der englische Begriff wird beim ersten Auftreten einmalig
-als Übersetzungsangabe in Klammern genannt (zum Beispiel:
-`(englisch: "Training Loop")`), damit die Studierenden den Begriff in
-Dokumentation und Tutorials wiedererkennen; der deutsche Begriff wird
-ins Glossar eingetragen.
+Englische Fachbegriffe werden nur dort verwendet, wo im deutschsprachigen Raum
+keine etablierte Entsprechung existiert (zum Beispiel: Batch Size). Existiert
+eine den Studierenden vertraute deutsche Entsprechung, wird durchgängig diese
+verwendet. Der englische Begriff wird beim ersten Auftreten einmalig als
+Übersetzungsangabe in Klammern genannt (zum Beispiel: `(englisch: "Training
+Loop")`), damit die Studierenden den Begriff in Dokumentation und Tutorials
+wiedererkennen; der deutsche Begriff wird ins Glossar eingetragen.
 
 Insbesondere gilt: **Schleife** statt "Loop", also for-Schleife,
 innere Schleife und Trainingsschleife.
@@ -122,7 +221,7 @@ Anhang in das Skript eingebunden.
 
 ---
 
-## 3. Didaktische Prinzipien
+## 4. Didaktische Prinzipien
 
 ### Prinzip: Erst Beispiel, dann abstrakt
 
@@ -148,14 +247,17 @@ gesetzt, nicht in eigene Boxen ausgelagert.
 
 ---
 
-## 4. Ausführbare Code-Zellen
+## 5. Ausführbare Code-Zellen
 
 ### Grundform
 
 ```{code-cell} python
-# Code-Zelle
-print("Beispiel")
+print("Example")
 ```
+
+### Sprache in Code-Zellen
+
+Für die Variablen werden englische Begriffe verwendet.
 
 ### Laufzeitregel (verbindlich)
 
@@ -182,7 +284,7 @@ torch.manual_seed(42)
 Plots, die aus Code-Zellen entstehen (Lernkurven, Datenexploration,
 Vorhersagen), werden mit **Plotly** erzeugt — interaktive Lernkurven
 sind ein Mehrwert des HTML-Skripts. Statische Konzeptabbildungen
-entstehen dagegen mit TikZ (siehe Abschnitt 8).
+entstehen dagegen mit TikZ (siehe Abschnitt 9).
 
 ### Lücken-Konvention
 
@@ -198,11 +300,13 @@ Der Marker `# IHR CODE HIER` und der Platzhalter `...` werden
 ausschließlich in dieser Form verwendet, damit Quelldateien,
 Lückennotebooks und Musterlösungen automatisiert konsistent gehalten
 werden können. Die HTML-Version auf GitHub Pages zeigt immer die
-gefüllten Zellen (Musterlösung).
+gefüllten Zellen (Musterlösung). Im Präsenz-Export des Studio-Formats
+(siehe Abschnitt 2) legt der Kommentar `% Lücke (Präsenz): ...` fest,
+welche Zeile einer ansonsten gefüllten Kernzelle zur Lücke wird.
 
 ---
 
-## 5. Übungen
+## 6. Übungen
 
 ### Mini-Übungen (innerhalb der Theorieteile)
 
@@ -227,7 +331,10 @@ Aufgabentext hier.
 Mini-Übungen dienen im Code-along-Format als Vorhersage- und
 Selbstkontrollmomente: bevorzugt Aufgaben des Typs „Was wird diese
 Zelle ausgeben?" oder „Ergänzen Sie die fehlende Zeile" — kurz genug
-für 2-3 Minuten im Termin.
+für 2-3 Minuten im Termin. In Sektionen im Studio-Format erscheinen
+Mini-Übungen ausschließlich im Selbststudium-Export (siehe Abschnitt 2);
+im Präsenz-Export entfallen sie und werden durch eine mündliche
+Live-Frage der Lehrperson ersetzt.
 
 ### Nummerierte Übungen (Schwierigkeitsgrad mit Sternen)
 
@@ -249,6 +356,24 @@ Schwierigkeitsgrade:
 Studierenden im Vorwort und in Woche 1 explizit mitgeteilt.
 Übungen der Kategorie „Mini-Projekt" bereiten gezielt auf die
 Projektphase vor (eigenständiger Workflow auf einem neuen Datensatz).
+
+### Studio-Aufgabe (Kleingruppenübung im Studio-Format)
+
+In Sektionen im Studio-Format (siehe Abschnitt 2) steht die nummerierte Übung
+nicht in der letzten Sektion des Kapitels, sondern direkt am Ende der eigenen
+Sektion unter der Überschrift `## Aufgaben`, kurz vor `## Zusammenfassung und
+Ausblick`. Sie erhält eine Sternebewertung wie jede andere nummerierte Übung bei
+(zum Beispiel Übung (✩✩)), da die Sterne weiterhin die Klausurkalibrierung
+transportieren, aber keine Nummer.
+
+Die Studio-Aufgabe ist für die Bearbeitung in Kleingruppen im Anschluss
+an den Code-along vorgesehen (etwa 15 Minuten) und verwendet dieselbe
+Lücken-Konvention wie die Kernzellen im Präsenz-Notebook: Das
+Aufgabengerüst enthält `# IHR CODE HIER`-Markierungen genau an den
+Stellen, die den im Code-along behandelten Bausteinen entsprechen. Die
+Teilaufgaben spiegeln die Reihenfolge dieser Bausteine, damit die
+Kleingruppen dem Termin unmittelbar folgen können, statt neu
+orientieren zu müssen.
 
 ### Backtick-Regel für Admonitions
 
@@ -288,7 +413,7 @@ Aufgabentext hier.
 
 ---
 
-## 6. Wiederkehrende Hinweis-Boxen
+## 7. Wiederkehrende Hinweis-Boxen
 
 ### Rechenumgebung (GPU-Hinweis)
 
@@ -320,7 +445,7 @@ gezeigten abweichen, ist das normal und kein Fehler.
 
 ---
 
-## 7. Medien und Tabellen
+## 8. Medien und Tabellen
 
 ### Eingebettete YouTube-Videos
 
@@ -352,7 +477,7 @@ MD060 auslöst.
 
 ---
 
-## 8. TikZ-Abbildungen
+## 9. TikZ-Abbildungen
 
 Alle Abbildungen werden als eigenständige `standalone`-Dokumente in
 LaTeX erstellt, nach SVG exportiert und über eine `{figure}`-Direktive
@@ -448,7 +573,7 @@ Beispiel Zahlenstrahlen). In allen anderen Fällen `0.8cm`.
 
 pgfplots wird nur für statische Konzeptgraphen verwendet
 (Aktivierungsfunktionen, schematische Loss-Landschaften). Lernkurven
-und Datenplots entstehen aus Code-Zellen mit Plotly (siehe Abschnitt 4).
+und Datenplots entstehen aus Code-Zellen mit Plotly (siehe Abschnitt 5).
 
 ```latex
 \begin{axis}[
